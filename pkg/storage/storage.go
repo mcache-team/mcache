@@ -11,28 +11,24 @@ type Storage struct {
 	storeType string
 }
 
-func NewStorage() storage.Storage {
-	return &Storage{store: &memory.Memory{}, storeType: "memory"}
-}
-
 func (s *Storage) GetOne(prefix string) (interface{}, error) {
 	return s.store.GetOne(prefix)
 }
 
-func (s *Storage) ListPrefixData(prefix string) ([]interface{}, error) {
+func (s *Storage) ListPrefixData(prefix []string) ([]interface{}, error) {
 	return s.store.ListPrefixData(prefix)
 }
 
-func (s *Storage) CountPrefixData(prefix string) (int, error) {
-	return s.store.CountPrefixData(prefix)
+func (s *Storage) CountPrefixData(prefixList []string) int {
+	return s.store.CountPrefixData(prefixList)
 }
 
-func (s *Storage) ListPrefix(prefixStr string) ([]string, error) {
-	return s.store.ListPrefix(prefixStr)
+func (s *Storage) ListPrefix(prePrefix string) ([]string, error) {
+	return s.store.ListPrefix(prePrefix)
 }
 
-func (s *Storage) CountPrefix(prefixStr string) (int, error) {
-	return s.store.CountPrefix(prefixStr)
+func (s *Storage) CountPrefix(prePrefix string) int {
+	return s.store.CountPrefix(prePrefix)
 }
 
 func (s *Storage) Insert(prefix string, data interface{}, opt ...item.Option) error {
@@ -43,6 +39,10 @@ func (s *Storage) Update(prefix string, data interface{}, opt ...item.Option) er
 	return s.store.Update(prefix, data, opt...)
 }
 
-func (s *Storage) Delete(prefix string) error {
+func (s *Storage) Delete(prefix string) (interface{}, error) {
 	return s.store.Delete(prefix)
+}
+
+func NewStorage() storage.Storage {
+	return &Storage{store: &memory.Memory{}, storeType: memory.MemoryStoreType}
 }
