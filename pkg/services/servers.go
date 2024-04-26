@@ -1,14 +1,14 @@
-package handlers
+package services
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/mcache-team/mcache/pkg/handlers/normal"
+	"github.com/mcache-team/mcache/pkg/services/normal"
 	"github.com/sirupsen/logrus"
 	"net/http"
 )
 
 func Start() {
-	gin.SetMode(gin.ReleaseMode)
+	gin.SetMode(gin.DebugMode)
 
 	engine := gin.New()
 	engine.Use(gin.Recovery())

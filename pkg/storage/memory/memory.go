@@ -5,21 +5,29 @@ import (
 	"github.com/mcache-team/mcache/pkg/apis/v1/storage"
 	"github.com/sirupsen/logrus"
 	"strings"
+	"sync"
 	"time"
 )
 
 type Memory struct {
 	prefixList []string
-	dataMap    map[string]*item.Item
+	dataMap    *sync.Map
 }
 
 var MemoryStoreType = "memory"
 
 var _ storage.Storage = &Memory{}
 
+func NewStorage() storage.Storage {
+	return &Memory{
+		prefixList: make([]string, 0),
+		dataMap:    new(sync.Map),
+	}
+}
 func (m *Memory) GetOne(prefix string) (interface{}, error) {
-	if data, has := m.dataMap[prefix]; has {
-		return data.Data, nil
+	if data, has := m.dataMap.Load(prefix); has {
+		item := data.(*item.Item)
+		return item.Data, nil
 	}
 	return nil, item.NoDataError
 }
@@ -28,12 +36,18 @@ func (m *Memory) GetOne(prefix string) (interface{}, error) {
 // list data by prefix list
 // get data with given prefix list
 func (m *Memory) ListPrefixData(prefixList []string) ([]interface{}, error) {
-	result := make([]interface{}, 0)
+	result := make([]interface{}, 0, len(prefixList))
+	prefixMap := map[string]struct{}{}
 	for _, item := range prefixList {
-		if data, has := m.dataMap[item]; has {
+		prefixMap[item] = struct{}{}
+	}
+	m.dataMap.Range(func(key, value interface{}) bool {
+		if _, has := prefixMap[key.(string)]; has {
+			data := value.(*item.Item)
 			result = append(result, data.Data)
 		}
-	}
+		return true
+	})
 	if len(result) == 0 {
 		return nil, item.NoDataError
 	}
@@ -43,7 +57,7 @@ func (m *Memory) ListPrefixData(prefixList []string) ([]interface{}, error) {
 func (m *Memory) CountPrefixData(prefixList []string) int {
 	count := len(prefixList)
 	for _, item := range prefixList {
-		if _, has := m.dataMap[item]; !has {
+		if _, has := m.dataMap.Load(item); !has {
 			count--
 		}
 	}
@@ -71,7 +85,7 @@ func (m *Memory) CountPrefix(prePrefix string) int {
 }
 
 func (m *Memory) Insert(prefix string, data interface{}, opt ...item.Option) error {
-	if _, has := m.dataMap[prefix]; has {
+	if _, has := m.dataMap.Load(prefix); has {
 		return item.PrefixExisted
 	}
 	cacheItem := &item.Item{
@@ -83,35 +97,36 @@ func (m *Memory) Insert(prefix string, data interface{}, opt ...item.Option) err
 	for _, op := range opt {
 		op(cacheItem)
 	}
-	m.dataMap[prefix] = cacheItem
+	m.dataMap.Store(prefix, cacheItem)
 	m.prefixList = append(m.prefixList, prefix)
 	return nil
 }
 
 func (m *Memory) Update(prefix string, data interface{}, opt ...item.Option) error {
-	cacheItem, has := m.dataMap[prefix]
+	data, has := m.dataMap.Load(prefix)
 	if !has {
 		return item.NoDataError
 	}
+	cacheItem := data.(*item.Item)
 	cacheItem.Data = data
 	for _, op := range opt {
 		op(cacheItem)
 	}
-	m.dataMap[prefix] = cacheItem
+	m.dataMap.Store(prefix, cacheItem)
 	return nil
 }
 
 func (m *Memory) Delete(prefix string) (interface{}, error) {
-	cacheItem, has := m.dataMap[prefix]
+	data, has := m.dataMap.Load(prefix)
 	if !has {
 		logrus.Warningf("cache item of prefix %s not existed", prefix)
 		return nil, item.PrefixNotExisted
 	}
-	delete(m.dataMap, prefix)
+	m.dataMap.Delete(prefix)
 	for idx, item := range m.prefixList {
 		if item == prefix {
 			m.prefixList = append(m.prefixList[:idx], m.prefixList[idx+1:]...)
 		}
 	}
-	return cacheItem.Data, nil
+	return data.(*item.Item).Data, nil
 }
