@@ -6,43 +6,45 @@ import (
 	"github.com/mcache-team/mcache/pkg/storage/memory"
 )
 
-type Storage struct {
+var StorageClient = NewStorage()
+
+type storageClient struct {
 	store     storage.Storage
 	storeType string
 }
 
-func (s *Storage) GetOne(prefix string) (interface{}, error) {
+func (s *storageClient) GetOne(prefix string) (interface{}, error) {
 	return s.store.GetOne(prefix)
 }
 
-func (s *Storage) ListPrefixData(prefix []string) ([]interface{}, error) {
+func (s *storageClient) ListPrefixData(prefix []string) ([]interface{}, error) {
 	return s.store.ListPrefixData(prefix)
 }
 
-func (s *Storage) CountPrefixData(prefixList []string) int {
+func (s *storageClient) CountPrefixData(prefixList []string) int {
 	return s.store.CountPrefixData(prefixList)
 }
 
-func (s *Storage) ListPrefix(prePrefix string) ([]string, error) {
+func (s *storageClient) ListPrefix(prePrefix string) ([]string, error) {
 	return s.store.ListPrefix(prePrefix)
 }
 
-func (s *Storage) CountPrefix(prePrefix string) int {
+func (s *storageClient) CountPrefix(prePrefix string) int {
 	return s.store.CountPrefix(prePrefix)
 }
 
-func (s *Storage) Insert(prefix string, data interface{}, opt ...item.Option) error {
+func (s *storageClient) Insert(prefix string, data interface{}, opt ...item.Option) error {
 	return s.store.Insert(prefix, data, opt...)
 }
 
-func (s *Storage) Update(prefix string, data interface{}, opt ...item.Option) error {
+func (s *storageClient) Update(prefix string, data interface{}, opt ...item.Option) error {
 	return s.store.Update(prefix, data, opt...)
 }
 
-func (s *Storage) Delete(prefix string) (interface{}, error) {
+func (s *storageClient) Delete(prefix string) (interface{}, error) {
 	return s.store.Delete(prefix)
 }
 
 func NewStorage() storage.Storage {
-	return &Storage{store: &memory.Memory{}, storeType: memory.MemoryStoreType}
+	return &storageClient{store: memory.NewStorage(), storeType: memory.MemoryStoreType}
 }
