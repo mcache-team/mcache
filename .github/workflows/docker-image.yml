@@ -14,9 +14,6 @@ jobs:
   build-and-push-image:
 
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        architecture: [ amd64, arm64, armv6 ]
     permissions:
       contents: read
       packages: write
@@ -46,7 +43,6 @@ jobs:
         with:
           context: .
           push: true
-          build-args: |
-            BUILDPLATFORM=linux/${{ matrix.architecture }}
+          platforms: linux/amd64,linux/arm64,linux/arm64/v8
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
