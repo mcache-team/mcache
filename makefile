@@ -1,16 +1,16 @@
 APP=mcache
 Version=1.0
 
-.PHONY: help all build run image
+.PHONY: help all build run image release
 
 help:
 	@echo "Usage: make <option>"
 	@echo "options and effects:"
-	@echo "	help : Show help"
-	@echo " all  : Build and run"
-	@echo "	build: Build the binary of this project"
-	@echo " image: Build docker image of this project"
-	@echo " run  : Run server"
+	@echo "	help   : Show help"
+	@echo " all    : Build and run"
+	@echo "	build  : Build the binary of this project"
+	@echo " run    : Run server"
+	@echo " image  : Build docker images"
 
 all: build run
 
