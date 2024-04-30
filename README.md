@@ -24,4 +24,5 @@
 大家如果觉得有什么不合理的或者有什么好点子，欢迎`issue`，当然，别嘲笑我==、我承认我是菜鸡。欢迎加我微信聊或者emial我
 
 - Email: [EvansChang](https://github.com/AlpherJang)(alphejangs@gmail.com)
+- Twitter: [twitter](https://twitter.com/EvansJang)
 - Wx: evanxtay
