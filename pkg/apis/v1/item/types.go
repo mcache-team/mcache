@@ -3,12 +3,12 @@ package item
 import "time"
 
 type Item struct {
-	Prefix     string
-	Data       interface{}
-	Timeout    time.Duration
-	ExpireTime time.Time
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	Prefix     string        `json:"prefix"`
+	Data       interface{}   `json:"data"`
+	Timeout    time.Duration `json:"timeout,omitempty"`
+	ExpireTime time.Time     `json:"expireTime,omitempty"`
+	CreatedAt  time.Time     `json:"createdAt"`
+	UpdatedAt  time.Time     `json:"UpdatedAt"`
 }
 
 type Option func(item *Item)

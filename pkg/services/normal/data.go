@@ -45,7 +45,7 @@ func (d *DataHandler) create(ctx *gin.Context) {
 		response.ResponseBadRequest(ctx, err)
 		return
 	}
-	if err := storage.StorageClient.Insert(req.Prefix, req); err != nil {
+	if err := storage.StorageClient.Insert(req.Prefix, req.Data); err != nil {
 		response.ResponseInternalServerError(ctx, err)
 		return
 	}

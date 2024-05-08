@@ -45,6 +45,6 @@ func (s *storageClient) Delete(prefix string) (interface{}, error) {
 	return s.store.Delete(prefix)
 }
 
-func NewStorage() storage.Storage {
+func NewStorage() *storageClient {
 	return &storageClient{store: memory.NewStorage(), storeType: memory.MemoryStoreType}
 }
