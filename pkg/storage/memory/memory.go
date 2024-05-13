@@ -24,10 +24,10 @@ func NewStorage() storage.Storage {
 		dataMap:    new(sync.Map),
 	}
 }
-func (m *Memory) GetOne(prefix string) (interface{}, error) {
+func (m *Memory) GetOne(prefix string) (*item.Item, error) {
 	if data, has := m.dataMap.Load(prefix); has {
 		item := data.(*item.Item)
-		return item.Data, nil
+		return item, nil
 	}
 	return nil, item.NoDataError
 }
@@ -35,8 +35,8 @@ func (m *Memory) GetOne(prefix string) (interface{}, error) {
 // ListPrefixData
 // list data by prefix list
 // get data with given prefix list
-func (m *Memory) ListPrefixData(prefixList []string) ([]interface{}, error) {
-	result := make([]interface{}, 0, len(prefixList))
+func (m *Memory) ListPrefixData(prefixList []string) ([]*item.Item, error) {
+	result := make([]*item.Item, 0, len(prefixList))
 	prefixMap := map[string]struct{}{}
 	for _, item := range prefixList {
 		prefixMap[item] = struct{}{}
@@ -44,7 +44,7 @@ func (m *Memory) ListPrefixData(prefixList []string) ([]interface{}, error) {
 	m.dataMap.Range(func(key, value interface{}) bool {
 		if _, has := prefixMap[key.(string)]; has {
 			data := value.(*item.Item)
-			result = append(result, data.Data)
+			result = append(result, data)
 		}
 		return true
 	})

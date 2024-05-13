@@ -13,11 +13,11 @@ type storageClient struct {
 	storeType string
 }
 
-func (s *storageClient) GetOne(prefix string) (interface{}, error) {
+func (s *storageClient) GetOne(prefix string) (*item.Item, error) {
 	return s.store.GetOne(prefix)
 }
 
-func (s *storageClient) ListPrefixData(prefix []string) ([]interface{}, error) {
+func (s *storageClient) ListPrefixData(prefix []string) ([]*item.Item, error) {
 	return s.store.ListPrefixData(prefix)
 }
 
@@ -45,6 +45,6 @@ func (s *storageClient) Delete(prefix string) (interface{}, error) {
 	return s.store.Delete(prefix)
 }
 
-func NewStorage() storage.Storage {
+func NewStorage() *storageClient {
 	return &storageClient{store: memory.NewStorage(), storeType: memory.MemoryStoreType}
 }
