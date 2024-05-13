@@ -1,4 +1,4 @@
-package normal
+package rest
 
 import (
 	"github.com/gin-gonic/gin"

@@ -2,7 +2,7 @@ package services
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/mcache-team/mcache/pkg/services/normal"
+	"github.com/mcache-team/mcache/pkg/services/rest"
 	"github.com/sirupsen/logrus"
 	"net/http"
 )
@@ -24,5 +24,5 @@ func addAPIs(engine *gin.Engine) {
 	engine.GET("/healthz", func(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{})
 	})
-	normal.Init(engine)
+	rest.Init(engine)
 }
