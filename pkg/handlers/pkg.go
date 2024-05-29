@@ -1,5 +1,5 @@
 package handlers
 
 var (
-	PrefixHandler = prefixHandler{}
+	PrefixHandler = NewPrefixTree()
 )
