@@ -3,8 +3,10 @@ package rest
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/mcache-team/mcache/pkg/apis/v1/item"
+	"github.com/mcache-team/mcache/pkg/handlers"
 	"github.com/mcache-team/mcache/pkg/services/response"
 	"github.com/mcache-team/mcache/pkg/storage"
+	"github.com/sirupsen/logrus"
 )
 
 func init() {
@@ -42,10 +44,11 @@ func (d *DataHandler) get(ctx *gin.Context) {
 func (d *DataHandler) create(ctx *gin.Context) {
 	var req item.Item
 	if err := ctx.ShouldBindJSON(&req); err != nil {
+		logrus.Info(req)
 		response.ResponseBadRequest(ctx, err)
 		return
 	}
-	if err := storage.StorageClient.Insert(req.Prefix, req.Data); err != nil {
+	if err := handlers.PrefixHandler.InsertNode(req.Prefix, req.Data); err != nil {
 		response.ResponseInternalServerError(ctx, err)
 		return
 	}
