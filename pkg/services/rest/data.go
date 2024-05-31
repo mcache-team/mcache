@@ -25,7 +25,7 @@ func (d *DataHandler) BasePath() string {
 
 func (d *DataHandler) RegisterRouter(e *gin.Engine) {
 	group := e.Group(d.BasePath())
-	group.GET("/:prefix/list", d.listByPrefix)
+	group.GET("/listByPrefix", d.listByPrefix)
 	group.GET("/:prefix", d.get)
 	group.DELETE("/:prefix", d.delete)
 	group.PUT("", d.create)
@@ -66,18 +66,12 @@ func (d *DataHandler) delete(ctx *gin.Context) {
 }
 
 func (d *DataHandler) listByPrefix(ctx *gin.Context) {
-	prefix := ctx.Param("prefix")
+	prefix := ctx.Query("prefix")
 	var (
-		err        error
-		prefixList []string
+		err  error
+		data []*item.Item
 	)
-	prefixList, err = storage.StorageClient.ListPrefix(prefix)
-	if err != nil {
-		response.ResponseInternalServerError(ctx, err)
-		return
-	}
-	var data []*item.Item
-	data, err = storage.StorageClient.ListPrefixData(prefixList)
+	data, err = handlers.PrefixHandler.ListNode(prefix)
 	if err != nil {
 		response.ResponseInternalServerError(ctx, err)
 		return
