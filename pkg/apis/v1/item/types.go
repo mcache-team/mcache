@@ -4,7 +4,7 @@ import "time"
 
 type Item struct {
 	Prefix     string        `json:"prefix"`
-	Data       []byte        `json:"data"`
+	Data       interface{}   `json:"data"`
 	Timeout    time.Duration `json:"timeout,omitempty"`
 	ExpireTime time.Time     `json:"expireTime,omitempty"`
 	CreatedAt  time.Time     `json:"createdAt"`

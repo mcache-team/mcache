@@ -84,7 +84,7 @@ func (m *Memory) CountPrefix(prePrefix string) int {
 	return count
 }
 
-func (m *Memory) Insert(prefix string, data []byte, opt ...item.Option) error {
+func (m *Memory) Insert(prefix string, data interface{}, opt ...item.Option) error {
 	if _, has := m.dataMap.Load(prefix); has {
 		return item.PrefixExisted
 	}
