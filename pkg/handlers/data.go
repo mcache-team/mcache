@@ -13,7 +13,7 @@ func NewPrefixTree() *prefixTree {
 	return &prefixTree{tree: make(map[string]*v1.PrefixNode)}
 }
 
-func (p *prefixTree) InsertNode(prefix string, data []byte) error {
+func (p *prefixTree) InsertNode(prefix string, data interface{}) error {
 	prefixPath := v1.Prefix(prefix).SplitPrefix()
 	node := p.mergeTree(prefixPath)
 	if node.Prefix == v1.Prefix(prefixPath[len(prefixPath)-1]) {

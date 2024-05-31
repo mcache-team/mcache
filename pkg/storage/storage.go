@@ -33,7 +33,7 @@ func (s *storageClient) CountPrefix(prePrefix string) int {
 	return s.store.CountPrefix(prePrefix)
 }
 
-func (s *storageClient) Insert(prefix string, data []byte, opt ...item.Option) error {
+func (s *storageClient) Insert(prefix string, data interface{}, opt ...item.Option) error {
 	return s.store.Insert(prefix, data, opt...)
 }
 

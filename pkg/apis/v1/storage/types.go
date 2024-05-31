@@ -8,7 +8,7 @@ type Storage interface {
 	CountPrefixData(prefixList []string) int
 	ListPrefix(prePrefix string) ([]string, error)
 	CountPrefix(prePrefix string) int
-	Insert(prefix string, data []byte, opt ...item.Option) error
+	Insert(prefix string, data interface{}, opt ...item.Option) error
 	Update(prefix string, data []byte, opt ...item.Option) error
 	Delete(prefix string) (interface{}, error)
 }
