@@ -63,6 +63,18 @@ func (p *prefixTree) searchNode(prefixGroup *v1.PrefixGroup) (node *v1.PrefixNod
 	return
 }
 
+func (p *prefixTree) RemoveNode(prefix string) (err error) {
+	prefixGroup := v1.Prefix(prefix).SplitPrefix()
+	var node *v1.PrefixNode
+	node, err = p.searchNode(prefixGroup)
+	if err != nil {
+		return
+	}
+	node.HasData = false
+	_, err = storage.StorageClient.Delete(prefix)
+	return
+}
+
 func (p *prefixTree) InsertNode(prefix string, data interface{}) error {
 	prefixGroup := v1.Prefix(prefix).SplitPrefix()
 	node := p.mergeTree(prefixGroup)

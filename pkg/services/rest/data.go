@@ -57,9 +57,8 @@ func (d *DataHandler) create(ctx *gin.Context) {
 
 func (d *DataHandler) delete(ctx *gin.Context) {
 	prefix := ctx.Param("prefix")
-	if _, err := storage.StorageClient.Delete(prefix); err != nil {
+	if err := handlers.PrefixHandler.RemoveNode(prefix); err != nil {
 		response.ResponseInternalServerError(ctx, err)
-		return
 	} else {
 		response.ResponseSuccess(ctx)
 	}
