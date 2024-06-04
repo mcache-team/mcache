@@ -1,0 +1,23 @@
+services:
+  testing:
+    build:
+      context: ..
+      dockerfile: e2e/Dockerfile
+    depends_on:
+      mcache:
+        condition: service_healthy
+    links:
+      - mcache
+
+  mcache:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        - GOPROXY=https://goproxy.cn,direct
+    healthcheck:
+      test: ["CMD", "bash", "-c", "cat < /dev/null > /dev/tcp/127.0.0.1/8080"]
+      interval: 3s
+      timeout: 60s
+      retries: 10
+      start_period: 3s

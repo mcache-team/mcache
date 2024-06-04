@@ -1,0 +1,37 @@
+#!api-testing
+# yaml-language-server: $schema=https://linuxsuren.github.io/api-testing/api-testing-schema.json
+name: mcache
+api: http://mcache:8080
+items:
+  - name: healthz
+    request:
+      api: /healthz
+  - name: putData
+    request:
+      api: /v1/data
+      method: PUT
+      body: |
+        {
+          "prefix": "first",
+          "data": "string"
+        }
+    expect:
+      statusCode: 201
+      body: |
+        {"code":0,"msg":"OK"}
+  - name: getPrefixCount
+    request:
+      api: /v1/prefix/count
+    expect:
+      bodyFieldsExpect:
+        count: 1
+  - name: getDataByPrefix
+    request:
+      api: /v1/data/first
+    expect:
+      bodyFieldsExpect:
+        data: string
+  - name: deleteDataByPrefix
+    request:
+      api: /v1/data/first
+      method: DELETE

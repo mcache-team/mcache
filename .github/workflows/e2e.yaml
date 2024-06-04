@@ -1,0 +1,19 @@
+name: E2E
+
+on:
+  - pull_request
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  e2e:
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run E2E
+        run: |
+          cd e2e && ./start.sh

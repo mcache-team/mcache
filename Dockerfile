@@ -1,12 +1,12 @@
 FROM golang:1.21 AS build-stage
-
+ARG GOPROXY=direct
 WORKDIR /opt/build
 
 COPY . .
 
 RUN go env -w GO111MODULE=on && \
     go mod tidy && \
-    CGO_ENABLED=0 GOOS=linux go build -o /mcache pkg/main.go
+    GOPROXY=${GOPROXY} CGO_ENABLED=0 GOOS=linux go build -o /mcache pkg/main.go
 
 FROM ubuntu:24.04 AS build-release-stage
 
@@ -20,5 +20,3 @@ ADD boot.sh /opt/mcache/boot.sh
 EXPOSE 8080
 
 ENTRYPOINT ["/opt/mcache/boot.sh"]
-
-
