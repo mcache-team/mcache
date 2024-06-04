@@ -4,6 +4,7 @@ WORKDIR /opt/build
 
 COPY . .
 
+ENV GOPROXY=$GOPROXY
 RUN go env -w GO111MODULE=on && \
     go mod tidy && \
     GOPROXY=${GOPROXY} CGO_ENABLED=0 GOOS=linux go build -o /mcache pkg/main.go

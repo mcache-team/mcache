@@ -22,3 +22,6 @@ run:
 
 image:
 	docker build . -t ${APP}:${Version}
+
+image-cn:
+	docker build . -t ${APP}:${Version} --build-arg GOPROXY=https://goproxy.cn,direct
