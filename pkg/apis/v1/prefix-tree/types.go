@@ -45,6 +45,17 @@ func (pg *PrefixGroup) IsEmpty() bool {
 	return false
 }
 
+func (pg *PrefixGroup) Rejoin() string {
+	if pg.RootPrefix == "" {
+		return ""
+	}
+	if len(pg.PrefixPath) == 0 {
+		return pg.RootPrefix
+	}
+	parts := append([]string{pg.RootPrefix}, pg.PrefixPath...)
+	return strings.Join(parts, "/")
+}
+
 type PrefixNode struct {
 	Prefix    Prefix        `json:"prefix"`
 	HasData   bool          `json:"hasData"`

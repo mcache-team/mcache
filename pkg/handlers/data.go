@@ -25,6 +25,8 @@ func (p *prefixTree) ListNode(prefix string) (list []*item.Item, err error) {
 	}
 	var prefixNode *v1.PrefixNode
 	if prefixNode, err = p.searchNode(prefixGroup); err != nil {
+		list = []*item.Item{}
+		err = nil
 		return
 	}
 	list = make([]*item.Item, 0, len(prefixNode.SubPrefix))
@@ -32,6 +34,10 @@ func (p *prefixTree) ListNode(prefix string) (list []*item.Item, err error) {
 		var data *item.Item
 		data, err = storage.StorageClient.GetOne(prefixItem.Prefix.Before(v1.Prefix(prefix)).String())
 		if err != nil {
+			if errors.Is(err, item.NoDataError) {
+				err = nil
+				continue
+			}
 			return
 		}
 		list = append(list, data)
@@ -75,14 +81,17 @@ func (p *prefixTree) RemoveNode(prefix string) (err error) {
 	return
 }
 
-func (p *prefixTree) InsertNode(prefix string, data interface{}) error {
+func (p *prefixTree) InsertNode(prefix string, data interface{}, opts ...item.Option) error {
+	if prefix == "" {
+		return errors.New("prefix is empty")
+	}
 	prefixGroup := v1.Prefix(prefix).SplitPrefix()
 	node := p.mergeTree(prefixGroup)
 	logrus.Infof("node prefix : %s", prefixGroup.NodePrefix)
 	if node.Prefix == v1.Prefix(prefixGroup.NodePrefix) {
 		node.HasData = true
 	}
-	err := storage.StorageClient.Insert(prefix, data)
+	err := storage.StorageClient.Insert(prefix, data, opts...)
 	return err
 }
 

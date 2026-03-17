@@ -10,6 +10,7 @@ import (
 )
 
 type Memory struct {
+	mu         sync.RWMutex
 	prefixList []string
 	dataMap    *sync.Map
 }
@@ -25,11 +26,16 @@ func NewStorage() storage.Storage {
 	}
 }
 func (m *Memory) GetOne(prefix string) (*item.Item, error) {
-	if data, has := m.dataMap.Load(prefix); has {
-		item := data.(*item.Item)
-		return item, nil
+	data, has := m.dataMap.Load(prefix)
+	if !has {
+		return nil, item.NoDataError
 	}
-	return nil, item.NoDataError
+	it := data.(*item.Item)
+	if !it.ExpireTime.IsZero() && it.ExpireTime.Before(time.Now()) {
+		m.Delete(prefix)
+		return nil, item.NoDataError
+	}
+	return it, nil
 }
 
 // ListPrefixData
@@ -65,6 +71,8 @@ func (m *Memory) CountPrefixData(prefixList []string) int {
 }
 
 func (m *Memory) ListPrefix(prePrefix string) ([]string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	result := make([]string, 0)
 	for _, item := range m.prefixList {
 		if strings.HasPrefix(item, prePrefix) {
@@ -75,6 +83,8 @@ func (m *Memory) ListPrefix(prePrefix string) ([]string, error) {
 }
 
 func (m *Memory) CountPrefix(prePrefix string) int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	count := 0
 	for _, item := range m.prefixList {
 		if strings.HasPrefix(item, prePrefix) {
@@ -85,32 +95,44 @@ func (m *Memory) CountPrefix(prePrefix string) int {
 }
 
 func (m *Memory) Insert(prefix string, data interface{}, opt ...item.Option) error {
-	if _, has := m.dataMap.Load(prefix); has {
-		return item.PrefixExisted
-	}
+	now := time.Now()
 	cacheItem := &item.Item{
 		Prefix:    prefix,
 		Data:      data,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		CreatedAt: now,
+		UpdatedAt: now,
 	}
 	for _, op := range opt {
 		op(cacheItem)
 	}
-	m.dataMap.Store(prefix, cacheItem)
+	if cacheItem.Timeout > 0 {
+		cacheItem.ExpireTime = cacheItem.CreatedAt.Add(cacheItem.Timeout)
+	}
+	if _, loaded := m.dataMap.LoadOrStore(prefix, cacheItem); loaded {
+		return item.PrefixExisted
+	}
+	m.mu.Lock()
 	m.prefixList = append(m.prefixList, prefix)
+	m.mu.Unlock()
 	return nil
 }
 
-func (m *Memory) Update(prefix string, data []byte, opt ...item.Option) error {
+func (m *Memory) Update(prefix string, data interface{}, opt ...item.Option) error {
 	existed, has := m.dataMap.Load(prefix)
 	if !has {
 		return item.NoDataError
 	}
 	cacheItem := existed.(*item.Item)
 	cacheItem.Data = data
+	cacheItem.UpdatedAt = time.Now()
+	oldExpireTime := cacheItem.ExpireTime
 	for _, op := range opt {
 		op(cacheItem)
+	}
+	if cacheItem.Timeout > 0 {
+		cacheItem.ExpireTime = time.Now().Add(cacheItem.Timeout)
+	} else {
+		cacheItem.ExpireTime = oldExpireTime
 	}
 	m.dataMap.Store(prefix, cacheItem)
 	return nil
@@ -123,10 +145,13 @@ func (m *Memory) Delete(prefix string) (interface{}, error) {
 		return nil, item.PrefixNotExisted
 	}
 	m.dataMap.Delete(prefix)
+	m.mu.Lock()
 	for idx, item := range m.prefixList {
 		if item == prefix {
 			m.prefixList = append(m.prefixList[:idx], m.prefixList[idx+1:]...)
+			break
 		}
 	}
+	m.mu.Unlock()
 	return data.(*item.Item).Data, nil
 }
