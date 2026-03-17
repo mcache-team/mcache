@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/mcache-team/mcache/pkg/apis/v1/item"
 	"github.com/mcache-team/mcache/pkg/handlers"
@@ -29,6 +30,7 @@ func (d *DataHandler) RegisterRouter(e *gin.Engine) {
 	group.GET("/:prefix", d.get)
 	group.DELETE("/:prefix", d.delete)
 	group.PUT("", d.create)
+	group.POST("/:prefix", d.update)
 }
 
 func (d *DataHandler) get(ctx *gin.Context) {
@@ -49,6 +51,10 @@ func (d *DataHandler) create(ctx *gin.Context) {
 		return
 	}
 	if err := handlers.PrefixHandler.InsertNode(req.Prefix, req.Data); err != nil {
+		if errors.Is(err, item.PrefixExisted) {
+			response.ResponseAlreadyExists(ctx)
+			return
+		}
 		response.ResponseInternalServerError(ctx, err)
 		return
 	}
@@ -58,10 +64,32 @@ func (d *DataHandler) create(ctx *gin.Context) {
 func (d *DataHandler) delete(ctx *gin.Context) {
 	prefix := ctx.Param("prefix")
 	if err := handlers.PrefixHandler.RemoveNode(prefix); err != nil {
+		if errors.Is(err, item.PrefixNotExisted) || errors.Is(err, item.NoDataError) {
+			response.ResponseNotFound(ctx)
+			return
+		}
 		response.ResponseInternalServerError(ctx, err)
 	} else {
 		response.ResponseSuccess(ctx)
 	}
+}
+
+func (d *DataHandler) update(ctx *gin.Context) {
+	prefix := ctx.Param("prefix")
+	var req item.Item
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		response.ResponseBadRequest(ctx, err)
+		return
+	}
+	var opts []item.Option
+	if req.Timeout > 0 {
+		opts = append(opts, item.WithTTL(req.Timeout))
+	}
+	if err := storage.StorageClient.Update(prefix, req.Data, opts...); err != nil {
+		response.RespondFailure(ctx, err)
+		return
+	}
+	response.ResponseSuccess(ctx)
 }
 
 func (d *DataHandler) listByPrefix(ctx *gin.Context) {
