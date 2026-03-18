@@ -74,7 +74,7 @@ func (p *prefixTree) RemoveNode(prefix string) (err error) {
 	var node *v1.PrefixNode
 	node, err = p.searchNode(prefixGroup)
 	if err != nil {
-		return
+		return item.PrefixNotExisted
 	}
 	node.HasData = false
 	_, err = storage.StorageClient.Delete(prefix)

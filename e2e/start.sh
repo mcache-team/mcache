@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
 
-docker-compose version
+docker compose version
 
-docker-compose up --build --exit-code-from testing
+docker compose up --build --exit-code-from testing
