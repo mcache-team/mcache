@@ -6,6 +6,9 @@ items:
   - name: healthz
     request:
       api: /healthz
+    expect:
+      statusCode: 200
+
   - name: putData
     request:
       api: /v1/data
@@ -19,19 +22,92 @@ items:
       statusCode: 201
       body: |
         {"code":0,"msg":"OK"}
+
+  - name: putDataDuplicate
+    request:
+      api: /v1/data
+      method: PUT
+      body: |
+        {
+          "prefix": "first",
+          "data": "string"
+        }
+    expect:
+      statusCode: 409
+
   - name: getPrefixCount
     request:
       api: /v1/prefix/count
     expect:
+      statusCode: 200
       bodyFieldsExpect:
         count: 1
+
   - name: getDataByPrefix
     request:
       api: /v1/data/first
     expect:
+      statusCode: 200
       bodyFieldsExpect:
         data: string
+
+  - name: updateData
+    request:
+      api: /v1/data/first
+      method: POST
+      body: |
+        {
+          "data": "updated"
+        }
+    expect:
+      statusCode: 200
+      body: |
+        {"code":0,"msg":"OK"}
+
+  - name: getUpdatedData
+    request:
+      api: /v1/data/first
+    expect:
+      statusCode: 200
+      bodyFieldsExpect:
+        data: updated
+
+  - name: getNotExist
+    request:
+      api: /v1/data/notexist
+    expect:
+      statusCode: 404
+
+  - name: putMultiLevelData
+    request:
+      api: /v1/data
+      method: PUT
+      body: |
+        {
+          "prefix": "first/second",
+          "data": "nested"
+        }
+    expect:
+      statusCode: 201
+
+  - name: listByPrefix
+    request:
+      api: /v1/data/listByPrefix?prefix=first
+    expect:
+      statusCode: 200
+
   - name: deleteDataByPrefix
     request:
       api: /v1/data/first
       method: DELETE
+    expect:
+      statusCode: 200
+      body: |
+        {"code":0,"msg":"OK"}
+
+  - name: deleteNotExist
+    request:
+      api: /v1/data/notexist
+      method: DELETE
+    expect:
+      statusCode: 404
