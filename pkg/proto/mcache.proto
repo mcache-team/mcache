@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package mcache;
+
+option go_package = "github.com/mcache-team/mcache/pkg/proto";
+
+service CacheService {
+  rpc Insert(InsertRequest) returns (InsertResponse);
+  rpc Get(GetRequest) returns (GetResponse);
+  rpc Update(UpdateRequest) returns (UpdateResponse);
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+  rpc ListByPrefix(ListByPrefixRequest) returns (ListByPrefixResponse);
+}
+
+message InsertRequest {
+  string prefix = 1;
+  bytes data = 2;
+  int64 ttl_seconds = 3; // 0 means no expiry
+}
+
+message InsertResponse {
+  bool success = 1;
+}
+
+message GetRequest {
+  string prefix = 1;
+}
+
+message GetResponse {
+  string prefix = 1;
+  bytes data = 2;
+  int64 expire_time = 3; // unix timestamp, 0 means no expiry
+  int64 created_at = 4;
+  int64 updated_at = 5;
+}
+
+message UpdateRequest {
+  string prefix = 1;
+  bytes data = 2;
+  int64 ttl_seconds = 3; // 0 means keep original ttl
+}
+
+message UpdateResponse {
+  bool success = 1;
+}
+
+message DeleteRequest {
+  string prefix = 1;
+}
+
+message DeleteResponse {
+  bool success = 1;
+}
+
+message ListByPrefixRequest {
+  string prefix = 1;
+}
+
+message ListByPrefixResponse {
+  repeated GetResponse items = 1;
+}
