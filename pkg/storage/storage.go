@@ -48,3 +48,8 @@ func (s *storageClient) Delete(prefix string) (interface{}, error) {
 func NewStorage() *storageClient {
 	return &storageClient{store: memory.NewStorage(), storeType: memory.MemoryStoreType}
 }
+
+// Store exposes the underlying storage backend (e.g. for persist.Snapshotter assertion).
+func (s *storageClient) Store() storage.Storage {
+	return s.store
+}

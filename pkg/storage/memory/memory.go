@@ -138,6 +138,36 @@ func (m *Memory) Update(prefix string, data interface{}, opt ...item.Option) err
 	return nil
 }
 
+// Snapshot returns all non-expired items for persistence.
+func (m *Memory) Snapshot() ([]*item.Item, error) {
+	now := time.Now()
+	result := make([]*item.Item, 0)
+	m.dataMap.Range(func(_, value interface{}) bool {
+		it := value.(*item.Item)
+		if it.ExpireTime.IsZero() || it.ExpireTime.After(now) {
+			result = append(result, it)
+		}
+		return true
+	})
+	return result, nil
+}
+
+// Restore loads items into storage, skipping already-expired entries.
+func (m *Memory) Restore(items []*item.Item) error {
+	now := time.Now()
+	for _, it := range items {
+		if !it.ExpireTime.IsZero() && it.ExpireTime.Before(now) {
+			continue
+		}
+		if _, loaded := m.dataMap.LoadOrStore(it.Prefix, it); !loaded {
+			m.mu.Lock()
+			m.prefixList = append(m.prefixList, it.Prefix)
+			m.mu.Unlock()
+		}
+	}
+	return nil
+}
+
 func (m *Memory) Delete(prefix string) (interface{}, error) {
 	data, has := m.dataMap.Load(prefix)
 	if !has {
