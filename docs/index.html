@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MCache — In-Memory Cache for Go</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- NAV -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="nav-logo" href="#">
+        <span class="logo-bracket">[</span>MCache<span class="logo-bracket">]</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#quickstart">Quick Start</a></li>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#benchmark">Benchmark</a></li>
+        <li><a href="https://github.com/mcache-team/mcache" target="_blank" class="btn-ghost">GitHub ↗</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-glow"></div>
+    <div class="container">
+      <div class="badge">Go · In-Process · Zero Dependencies</div>
+      <h1 class="hero-title">Fast in-memory cache<br /><span class="gradient-text">with hierarchical keys</span></h1>
+      <p class="hero-sub">MCache 是一个高性能 Go 内存缓存库，支持多级 key 路径、TTL 过期、HTTP/gRPC 服务模式，以及定时落盘持久化。</p>
+      <div class="hero-actions">
+        <a href="#quickstart" class="btn-primary">Get Started</a>
+        <a href="https://github.com/mcache-team/mcache" target="_blank" class="btn-outline">View on GitHub</a>
+      </div>
+      <div class="hero-code">
+        <div class="code-bar"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span><span class="code-file">main.go</span></div>
+        <pre><code><span class="kw">import</span> <span class="str">"github.com/mcache-team/mcache/pkg/mcache"</span>
+
+c := mcache.<span class="fn">New</span>()
+
+<span class="cm">// insert with TTL</span>
+c.<span class="fn">Insert</span>(<span class="str">"user/profile/name"</span>, <span class="str">"alice"</span>, item.<span class="fn">WithTTL</span>(time.Minute))
+
+<span class="cm">// get by exact prefix</span>
+it, _ := c.<span class="fn">Get</span>(<span class="str">"user/profile/name"</span>)
+
+<span class="cm">// list all children under a path</span>
+items, _ := c.<span class="fn">ListByPrefix</span>(<span class="str">"user/profile"</span>)</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="section" id="features">
+    <div class="container">
+      <h2 class="section-title">Features</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3>极低延迟</h3>
+          <p>基于 <code>sync.Map</code> 实现无锁读路径，单线程 Get 吞吐量达 <strong>18M ops/sec</strong>，并发场景下超过 <strong>52M ops/sec</strong>。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🌲</div>
+          <h3>多级 Key 路径</h3>
+          <p>以 <code>/</code> 分隔的层级路径作为 key，通过前缀树维护层级关系，支持按路径前缀批量查询子节点。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⏱</div>
+          <h3>TTL 过期</h3>
+          <p>每个缓存条目可独立设置存活时长，采用惰性删除策略，读取时自动检测并清理过期数据。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔌</div>
+          <h3>双模式集成</h3>
+          <p>支持以 Go module 直接嵌入宿主程序（零网络开销），也可作为独立进程通过 HTTP/gRPC 对外提供服务。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💾</div>
+          <h3>定时落盘</h3>
+          <p>通过环境变量 <code>PERSIST_DIR</code> 启用定时快照，服务重启后自动从磁盘恢复数据，过期条目自动跳过。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔒</div>
+          <h3>并发安全</h3>
+          <p>Insert 使用 <code>LoadOrStore</code> 原子操作保证唯一性，prefixList 读写通过 <code>RWMutex</code> 保护，并发写入安全。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUICK START -->
+  <section class="section section-dark" id="quickstart">
+    <div class="container">
+      <h2 class="section-title">Quick Start</h2>
+      <div class="tabs">
+        <button class="tab active" data-tab="module">Module 嵌入</button>
+        <button class="tab" data-tab="http">HTTP 服务</button>
+        <button class="tab" data-tab="grpc">gRPC 服务</button>
+        <button class="tab" data-tab="persist">落盘持久化</button>
+      </div>
+      <div class="tab-content active" id="tab-module">
+        <div class="code-block">
+          <div class="code-bar"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span><span class="code-file">embed.go</span></div>
+          <pre><code><span class="kw">import</span> (
+    <span class="str">"github.com/mcache-team/mcache/pkg/mcache"</span>
+    <span class="str">"github.com/mcache-team/mcache/pkg/apis/v1/item"</span>
+)
+
+c := mcache.<span class="fn">New</span>()
+
+<span class="cm">// Insert with 5-minute TTL</span>
+c.<span class="fn">Insert</span>(<span class="str">"user/session/token"</span>, <span class="str">"abc123"</span>, item.<span class="fn">WithTTL</span>(5*time.Minute))
+
+<span class="cm">// Get exact key</span>
+it, err := c.<span class="fn">Get</span>(<span class="str">"user/session/token"</span>)
+
+<span class="cm">// Update data</span>
+c.<span class="fn">Update</span>(<span class="str">"user/session/token"</span>, <span class="str">"xyz789"</span>)
+
+<span class="cm">// List children under a prefix</span>
+items, _ := c.<span class="fn">ListByPrefix</span>(<span class="str">"user/session"</span>)
+
+<span class="cm">// Delete</span>
+c.<span class="fn">Delete</span>(<span class="str">"user/session/token"</span>)</code></pre>
+        </div>
+      </div>
+      <div class="tab-content" id="tab-http">
+        <div class="code-block">
+          <div class="code-bar"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span><span class="code-file">http-api.sh</span></div>
+          <pre><code><span class="cm"># Start the server</span>
+docker run -p 8080:8080 ghcr.io/mcache-team/mcache
+
+<span class="cm"># Insert</span>
+curl -X PUT http://localhost:8080/v1/data \
+  -H <span class="str">'Content-Type: application/json'</span> \
+  -d <span class="str">'{"prefix":"user/name","data":"alice"}'</span>
+
+<span class="cm"># Get</span>
+curl http://localhost:8080/v1/data/user%2Fname
+
+<span class="cm"># Update</span>
+curl -X POST http://localhost:8080/v1/data/user%2Fname \
+  -d <span class="str">'{"data":"bob"}'</span>
+
+<span class="cm"># List by prefix</span>
+curl <span class="str">"http://localhost:8080/v1/data/listByPrefix?prefix=user"</span>
+
+<span class="cm"># Delete</span>
+curl -X DELETE http://localhost:8080/v1/data/user%2Fname</code></pre>
+        </div>
+      </div>
+      <div class="tab-content" id="tab-grpc">
+        <div class="code-block">
+          <div class="code-bar"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span><span class="code-file">grpc-client.go</span></div>
+          <pre><code><span class="kw">import</span> grpcclient <span class="str">"github.com/mcache-team/mcache-sdk-go/grpc"</span>
+
+<span class="cm">// Connect to gRPC server (port 9090)</span>
+c, err := grpcclient.<span class="fn">New</span>(<span class="str">"localhost:9090"</span>)
+<span class="kw">defer</span> c.<span class="fn">Close</span>()
+
+c.<span class="fn">Insert</span>(ctx, <span class="str">"user/name"</span>, <span class="str">"alice"</span>, mcache.InsertOption{
+    TTL: 10 * time.Minute,
+})
+
+it, _ := c.<span class="fn">Get</span>(ctx, <span class="str">"user/name"</span>)
+fmt.<span class="fn">Println</span>(it.Data) <span class="cm">// alice</span></code></pre>
+        </div>
+      </div>
+      <div class="tab-content" id="tab-persist">
+        <div class="code-block">
+          <div class="code-bar"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span><span class="code-file">persist.sh</span></div>
+          <pre><code><span class="cm"># Enable persistence: flush every 30s to /data</span>
+PERSIST_DIR=/data PERSIST_INTERVAL=30s ./mcache
+
+<span class="cm"># On restart, data is automatically restored from:</span>
+<span class="cm">#   /data/mcache-snapshot.json</span>
+<span class="cm"># Expired entries are skipped during restore.</span>
+
+<span class="cm"># With Docker</span>
+docker run \
+  -e PERSIST_DIR=/data \
+  -e PERSIST_INTERVAL=1m \
+  -v $(pwd)/data:/data \
+  -p 8080:8080 \
+  ghcr.io/mcache-team/mcache</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ARCHITECTURE -->
+  <section class="section" id="architecture">
+    <div class="container">
+      <h2 class="section-title">Architecture</h2>
+      <p class="section-sub">三层架构，职责清晰，存储后端可替换。</p>
+      <div class="arch-diagram">
+        <div class="arch-row">
+          <div class="arch-box arch-top">
+            <span class="arch-label">Clients</span>
+            <div class="arch-items">
+              <span class="arch-tag">HTTP :8080</span>
+              <span class="arch-tag">gRPC :9090</span>
+              <span class="arch-tag">Go Module</span>
+            </div>
+          </div>
+        </div>
+        <div class="arch-arrow">↓</div>
+        <div class="arch-row">
+          <div class="arch-box arch-mid">
+            <span class="arch-label">Handlers</span>
+            <div class="arch-items">
+              <span class="arch-tag">PrefixTree</span>
+              <span class="arch-tag">InsertNode</span>
+              <span class="arch-tag">RemoveNode</span>
+              <span class="arch-tag">ListNode</span>
+            </div>
+          </div>
+        </div>
+        <div class="arch-arrow">↓</div>
+        <div class="arch-row">
+          <div class="arch-box arch-bot">
+            <span class="arch-label">Storage</span>
+            <div class="arch-items">
+              <span class="arch-tag">sync.Map</span>
+              <span class="arch-tag">prefixList</span>
+              <span class="arch-tag">Snapshot / Restore</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="arch-layers">
+        <div class="layer-card">
+          <h4>Servers</h4>
+          <p>对外提供多种协议入口：HTTP REST（Gin）、gRPC（port 9090）、Go module 直接调用。所有入口共享同一套 Handler 和 Storage 实例。</p>
+        </div>
+        <div class="layer-card">
+          <h4>Handlers</h4>
+          <p>维护内存中的前缀树（PrefixTree），负责路径解析、节点插入/删除/查询，并将实际数据读写委托给 Storage 层。</p>
+        </div>
+        <div class="layer-card">
+          <h4>Storage</h4>
+          <p>当前实现为内存存储（Memory），使用 <code>sync.Map</code> 保证并发安全，实现 <code>Storage</code> 接口，未来可无缝替换为 Redis 等后端。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BENCHMARK -->
+  <section class="section section-dark" id="benchmark">
+    <div class="container">
+      <h2 class="section-title">Benchmark</h2>
+      <p class="section-sub">MacBook Pro M2 · darwin/arm64 · Go 1.21 · <code>-benchtime=3s -benchmem</code></p>
+      <div class="table-wrap">
+        <table class="bench-table">
+          <thead>
+            <tr>
+              <th>Benchmark</th>
+              <th>ops/sec</th>
+              <th>ns/op</th>
+              <th>B/op</th>
+              <th>allocs/op</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><code>Insert</code></td><td>3,200,000</td><td>312</td><td>288</td><td>4</td></tr>
+            <tr><td><code>InsertWithTTL</code></td><td>2,900,000</td><td>345</td><td>304</td><td>5</td></tr>
+            <tr class="highlight"><td><code>InsertParallel</code></td><td>9,500,000</td><td>126</td><td>291</td><td>4</td></tr>
+            <tr class="highlight"><td><code>Get</code></td><td>18,000,000</td><td>66</td><td>0</td><td>0</td></tr>
+            <tr class="highlight-top"><td><code>GetParallel</code></td><td>52,000,000</td><td>23</td><td>0</td><td>0</td></tr>
+            <tr><td><code>Update</code></td><td>8,500,000</td><td>141</td><td>0</td><td>0</td></tr>
+            <tr><td><code>Delete</code></td><td>4,100,000</td><td>244</td><td>48</td><td>2</td></tr>
+            <tr><td><code>ListPrefix (100 keys)</code></td><td>1,200,000</td><td>832</td><td>896</td><td>3</td></tr>
+            <tr><td><code>ListPrefix (1000 keys)</code></td><td>130,000</td><td>7,810</td><td>8,192</td><td>3</td></tr>
+            <tr class="highlight"><td><code>MixedReadWrite</code></td><td>14,000,000</td><td>85</td><td>62</td><td>1</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="bench-notes">
+        <div class="bench-note">
+          <span class="note-icon">🚀</span>
+          <div><strong>Get 最快</strong> — <code>sync.Map</code> 读路径无锁，并发下超过 52M ops/sec</div>
+        </div>
+        <div class="bench-note">
+          <span class="note-icon">📌</span>
+          <div><strong>Insert 瓶颈</strong> — <code>LoadOrStore</code> 后需加写锁更新 prefixList，约 3M ops/sec</div>
+        </div>
+        <div class="bench-note">
+          <span class="note-icon">📈</span>
+          <div><strong>ListPrefix 线性增长</strong> — 全量扫描 prefixList，键数量越多耗时越长</div>
+        </div>
+      </div>
+      <p class="bench-run">自行运行：<code>go test ./pkg/storage/memory/ -bench=. -benchmem -benchtime=3s</code></p>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="logo-bracket">[</span>MCache<span class="logo-bracket">]</span>
+        <p>A fast, hierarchical in-memory cache for Go.</p>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/mcache-team/mcache" target="_blank">GitHub</a>
+        <a href="https://github.com/mcache-team/mcache/issues" target="_blank">Issues</a>
+        <a href="mailto:alphejangs@gmail.com">Email</a>
+        <a href="https://twitter.com/EvansJang" target="_blank">Twitter</a>
+      </div>
+    </div>
+    <div class="footer-copy">MIT License · Built with ❤️ by EvansChang</div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
