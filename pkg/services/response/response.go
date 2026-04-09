@@ -39,6 +39,13 @@ func ResponseAccepted(ctx *gin.Context) {
 	ctx.JSON(http.StatusAccepted, successResp)
 }
 
+func ResponseTemporaryRedirect(ctx *gin.Context, leaderAddress string) {
+	if leaderAddress != "" {
+		ctx.Header("Location", leaderAddress)
+	}
+	ctx.JSON(http.StatusTemporaryRedirect, NewErrorResp(http.StatusTemporaryRedirect, "request must be sent to cluster leader"))
+}
+
 func ResponseBadRequest(ctx *gin.Context, err error) {
 	ctx.JSON(http.StatusBadRequest, NewErrorResp(http.StatusBadGateway, err.Error()))
 }
