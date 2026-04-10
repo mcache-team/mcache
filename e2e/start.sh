@@ -1,6 +1,14 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-docker-compose version
+if docker compose version >/dev/null 2>&1; then
+  COMPOSE=(docker compose)
+elif docker-compose version >/dev/null 2>&1; then
+  COMPOSE=(docker-compose)
+else
+  echo "docker compose or docker-compose is required" >&2
+  exit 1
+fi
 
-docker-compose up --build --exit-code-from testing
+"${COMPOSE[@]}" version
+"${COMPOSE[@]}" up --build --exit-code-from testing
