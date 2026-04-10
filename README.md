@@ -1,5 +1,6 @@
 # MCache
 
+[![pages-build-deployment](https://github.com/mcache-team/mcache/actions/workflows/pages/pages-build-deployment/badge.svg)](https://github.com/mcache-team/mcache/actions/workflows/pages/pages-build-deployment)
 ![mcache](doc/pic/mcache.png)
 
 A fast, hierarchical in-memory cache for Go. Supports multi-level key paths, TTL expiration, HTTP/gRPC service modes, periodic disk persistence, and direct module embedding — no external dependencies required.
