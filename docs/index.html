@@ -18,7 +18,9 @@
       <ul class="nav-links">
         <li><a href="#features">Features</a></li>
         <li><a href="#quickstart">Quick Start</a></li>
+        <li><a href="#cluster">Cluster</a></li>
         <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#ops">Ops</a></li>
         <li><a href="#benchmark">Benchmark</a></li>
         <li><a href="https://github.com/mcache-team/mcache" target="_blank" class="btn-ghost">GitHub ↗</a></li>
       </ul>
@@ -29,27 +31,28 @@
   <section class="hero">
     <div class="hero-glow"></div>
     <div class="container">
-      <div class="badge">Go · In-Process · Zero Dependencies</div>
-      <h1 class="hero-title">Fast in-memory cache<br /><span class="gradient-text">with hierarchical keys</span></h1>
-      <p class="hero-sub">MCache 是一个高性能 Go 内存缓存库，支持多级 key 路径、TTL 过期、HTTP/gRPC 服务模式，以及定时落盘持久化。</p>
+      <div class="badge">Go · Hierarchical Keys · Raft Cluster · Prometheus Metrics</div>
+      <h1 class="hero-title">Fast in-memory cache<br /><span class="gradient-text">now with raft-backed cluster mode</span></h1>
+      <p class="hero-sub">MCache 现在不仅是一个高性能 Go 内存缓存库，也可以按集群模式运行，支持 replicated writes、成员管理、健康探针、Prometheus 指标和故障恢复验证。</p>
       <div class="hero-actions">
         <a href="#quickstart" class="btn-primary">Get Started</a>
-        <a href="https://github.com/mcache-team/mcache" target="_blank" class="btn-outline">View on GitHub</a>
+        <a href="#cluster" class="btn-outline">See Cluster Mode</a>
       </div>
       <div class="hero-code">
         <div class="code-bar"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span><span class="code-file">main.go</span></div>
-        <pre><code><span class="kw">import</span> <span class="str">"github.com/mcache-team/mcache/pkg/mcache"</span>
+        <pre><code><span class="cm"># start node-1 in raft mode</span>
+MCACHE_CLUSTER_MODE=raft \
+MCACHE_NODE_ID=node-1 \
+MCACHE_HTTP_ADDR=0.0.0.0:8081 \
+MCACHE_ADVERTISE_ADDR=http://127.0.0.1:8081 \
+MCACHE_RAFT_BIND_ADDR=127.0.0.1:7001 \
+MCACHE_RAFT_ADVERTISE_ADDR=127.0.0.1:7001 \
+MCACHE_RAFT_BOOTSTRAP=true \
+go run ./pkg
 
-c := mcache.<span class="fn">New</span>()
-
-<span class="cm">// insert with TTL</span>
-c.<span class="fn">Insert</span>(<span class="str">"user/profile/name"</span>, <span class="str">"alice"</span>, item.<span class="fn">WithTTL</span>(time.Minute))
-
-<span class="cm">// get by exact prefix</span>
-it, _ := c.<span class="fn">Get</span>(<span class="str">"user/profile/name"</span>)
-
-<span class="cm">// list all children under a path</span>
-items, _ := c.<span class="fn">ListByPrefix</span>(<span class="str">"user/profile"</span>)</code></pre>
+<span class="cm"># inspect readiness and metrics</span>
+curl http://127.0.0.1:8081/readyz
+curl http://127.0.0.1:8081/metrics</code></pre>
       </div>
     </div>
   </section>
@@ -70,9 +73,9 @@ items, _ := c.<span class="fn">ListByPrefix</span>(<span class="str">"user/profi
           <p>以 <code>/</code> 分隔的层级路径作为 key，通过前缀树维护层级关系，支持按路径前缀批量查询子节点。</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">⏱</div>
-          <h3>TTL 过期</h3>
-          <p>每个缓存条目可独立设置存活时长，采用惰性删除策略，读取时自动检测并清理过期数据。</p>
+          <div class="feature-icon">🗳</div>
+          <h3>Raft 集群模式</h3>
+          <p>支持单机模式和 <code>raft</code> 模式切换，写请求通过日志复制达成一致，具备 leader 选举、故障切换和快照恢复能力。</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">🔌</div>
@@ -80,14 +83,14 @@ items, _ := c.<span class="fn">ListByPrefix</span>(<span class="str">"user/profi
           <p>支持以 Go module 直接嵌入宿主程序（零网络开销），也可作为独立进程通过 HTTP/gRPC 对外提供服务。</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">💾</div>
-          <h3>定时落盘</h3>
-          <p>通过环境变量 <code>PERSIST_DIR</code> 启用定时快照，服务重启后自动从磁盘恢复数据，过期条目自动跳过。</p>
+          <div class="feature-icon">📈</div>
+          <h3>可观测性</h3>
+          <p>内置 <code>/livez</code>、<code>/readyz</code>、<code>/metrics</code> 和 <code>/v1/cluster/diagnostics</code>，方便接入 Prometheus 和容器编排探针。</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">🔒</div>
-          <h3>并发安全</h3>
-          <p>Insert 使用 <code>LoadOrStore</code> 原子操作保证唯一性，prefixList 读写通过 <code>RWMutex</code> 保护，并发写入安全。</p>
+          <div class="feature-icon">🧪</div>
+          <h3>恢复验证</h3>
+          <p>仓库内置 smoke、quorum 和 rolling restart 三类 e2e 脚本，用于验证 failover、成员恢复和多数派写入行为。</p>
         </div>
       </div>
     </div>
@@ -100,8 +103,10 @@ items, _ := c.<span class="fn">ListByPrefix</span>(<span class="str">"user/profi
       <div class="tabs">
         <button class="tab active" data-tab="module">Module 嵌入</button>
         <button class="tab" data-tab="http">HTTP 服务</button>
+        <button class="tab" data-tab="cluster">Cluster 模式</button>
         <button class="tab" data-tab="grpc">gRPC 服务</button>
         <button class="tab" data-tab="persist">落盘持久化</button>
+        <button class="tab" data-tab="metrics">Metrics</button>
       </div>
       <div class="tab-content active" id="tab-module">
         <div class="code-block">
@@ -154,6 +159,25 @@ curl <span class="str">"http://localhost:8080/v1/data/listByPrefix?prefix=user"<
 curl -X DELETE http://localhost:8080/v1/data/user%2Fname</code></pre>
         </div>
       </div>
+      <div class="tab-content" id="tab-cluster">
+        <div class="code-block">
+          <div class="code-bar"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span><span class="code-file">raft-cluster.sh</span></div>
+          <pre><code><span class="cm"># Node 1</span>
+MCACHE_CLUSTER_MODE=raft \
+MCACHE_NODE_ID=node-1 \
+MCACHE_HTTP_ADDR=0.0.0.0:8081 \
+MCACHE_ADVERTISE_ADDR=http://127.0.0.1:8081 \
+MCACHE_RAFT_BIND_ADDR=127.0.0.1:7001 \
+MCACHE_RAFT_ADVERTISE_ADDR=127.0.0.1:7001 \
+MCACHE_RAFT_BOOTSTRAP=true \
+MCACHE_CLUSTER_PEERS=<span class="str">'node-1@127.0.0.1:7001@http://127.0.0.1:8081,node-2@127.0.0.1:7002@http://127.0.0.1:8082,node-3@127.0.0.1:7003@http://127.0.0.1:8083'</span> \
+go run ./pkg
+
+<span class="cm"># inspect cluster</span>
+curl http://127.0.0.1:8081/v1/cluster/status
+curl http://127.0.0.1:8081/v1/cluster/nodes</code></pre>
+        </div>
+      </div>
       <div class="tab-content" id="tab-grpc">
         <div class="code-block">
           <div class="code-bar"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span><span class="code-file">grpc-client.go</span></div>
@@ -190,6 +214,50 @@ docker run \
   ghcr.io/mcache-team/mcache</code></pre>
         </div>
       </div>
+      <div class="tab-content" id="tab-metrics">
+        <div class="code-block">
+          <div class="code-bar"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span><span class="code-file">observability.sh</span></div>
+          <pre><code><span class="cm"># health probes</span>
+curl http://127.0.0.1:8080/livez
+curl http://127.0.0.1:8080/readyz
+
+<span class="cm"># diagnostics</span>
+curl http://127.0.0.1:8080/v1/cluster/diagnostics
+
+<span class="cm"># Prometheus metrics</span>
+curl http://127.0.0.1:8080/metrics
+
+<span class="cm"># example metric families</span>
+<span class="cm"># mcache_write_requests_total</span>
+<span class="cm"># mcache_write_latency_seconds_bucket</span>
+<span class="cm"># mcache_raft_commit_index</span></code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CLUSTER -->
+  <section class="section" id="cluster">
+    <div class="container">
+      <h2 class="section-title">Cluster Mode</h2>
+      <p class="section-sub">从单机内存缓存到 raft-backed replicated service，保留简洁接口，同时补齐真实运行时能力。</p>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">👑</div>
+          <h3>Leader-aware Writes</h3>
+          <p>写请求统一经过 cluster node 提交；leader 负责追加 raft 日志，follower 会返回 <code>307 Temporary Redirect</code>。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🧩</div>
+          <h3>Dynamic Membership</h3>
+          <p>支持通过 <code>/v1/cluster/nodes</code> 动态添加和移除 voter 节点，不需要每次都靠静态 peer 配置重启整套集群。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💽</div>
+          <h3>Snapshot & Restore</h3>
+          <p>raft 日志配合文件快照和本地状态机恢复，在节点重启、追日志和 leader 切换后保持数据状态可延续。</p>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -197,7 +265,7 @@ docker run \
   <section class="section" id="architecture">
     <div class="container">
       <h2 class="section-title">Architecture</h2>
-      <p class="section-sub">三层架构，职责清晰，存储后端可替换。</p>
+      <p class="section-sub">现在的核心已经从单纯的 handler + memory store，收口成可被 raft 驱动的统一状态机。</p>
       <div class="arch-diagram">
         <div class="arch-row">
           <div class="arch-box arch-top">
@@ -206,29 +274,31 @@ docker run \
               <span class="arch-tag">HTTP :8080</span>
               <span class="arch-tag">gRPC :9090</span>
               <span class="arch-tag">Go Module</span>
+              <span class="arch-tag">/metrics</span>
             </div>
           </div>
         </div>
         <div class="arch-arrow">↓</div>
         <div class="arch-row">
           <div class="arch-box arch-mid">
-            <span class="arch-label">Handlers</span>
+            <span class="arch-label">Cluster Node</span>
             <div class="arch-items">
-              <span class="arch-tag">PrefixTree</span>
-              <span class="arch-tag">InsertNode</span>
-              <span class="arch-tag">RemoveNode</span>
-              <span class="arch-tag">ListNode</span>
+              <span class="arch-tag">Single / Raft</span>
+              <span class="arch-tag">Leader Redirect</span>
+              <span class="arch-tag">Membership</span>
+              <span class="arch-tag">Diagnostics</span>
             </div>
           </div>
         </div>
         <div class="arch-arrow">↓</div>
         <div class="arch-row">
           <div class="arch-box arch-bot">
-            <span class="arch-label">Storage</span>
+            <span class="arch-label">State Machine</span>
             <div class="arch-items">
-              <span class="arch-tag">sync.Map</span>
-              <span class="arch-tag">prefixList</span>
+              <span class="arch-tag">Items + Prefix Index</span>
+              <span class="arch-tag">Command Apply</span>
               <span class="arch-tag">Snapshot / Restore</span>
+              <span class="arch-tag">Telemetry</span>
             </div>
           </div>
         </div>
@@ -236,16 +306,52 @@ docker run \
       <div class="arch-layers">
         <div class="layer-card">
           <h4>Servers</h4>
-          <p>对外提供多种协议入口：HTTP REST（Gin）、gRPC（port 9090）、Go module 直接调用。所有入口共享同一套 Handler 和 Storage 实例。</p>
+          <p>对外提供 REST、health probes、metrics 和 cluster 管理入口。HTTP 写请求统一汇聚到 cluster node，再决定本地执行还是 raft 复制。</p>
         </div>
         <div class="layer-card">
-          <h4>Handlers</h4>
-          <p>维护内存中的前缀树（PrefixTree），负责路径解析、节点插入/删除/查询，并将实际数据读写委托给 Storage 层。</p>
+          <h4>Cluster</h4>
+          <p>封装 single / raft 两种运行模式，对外暴露统一的 submit、成员管理、ready 检查和 diagnostics 接口，便于服务层无差别调用。</p>
         </div>
         <div class="layer-card">
-          <h4>Storage</h4>
-          <p>当前实现为内存存储（Memory），使用 <code>sync.Map</code> 保证并发安全，实现 <code>Storage</code> 接口，未来可无缝替换为 Redis 等后端。</p>
+          <h4>State Machine</h4>
+          <p>KV 数据和 prefix index 统一维护在同一个状态机里，通过 command 驱动 apply，便于快照、恢复和后续继续扩展分片或更多复制策略。</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OPS -->
+  <section class="section section-dark" id="ops">
+    <div class="container">
+      <h2 class="section-title">Ops & Recovery</h2>
+      <p class="section-sub">不仅能跑起来，也尽量把“怎么确认它是对的”一起做进仓库里。</p>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🩺</div>
+          <h3>Health Probes</h3>
+          <p><code>/livez</code> 提供存活检查，<code>/readyz</code> 和 <code>/healthz</code> 会基于当前 raft 角色和 leader 状态给出 ready 结果。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <h3>Prometheus Metrics</h3>
+          <p>输出缓存条目数、成员数、raft 索引、写请求计数，以及标准 histogram 形式的写延迟指标，便于直接接 Prometheus。</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔁</div>
+          <h3>Recovery E2E</h3>
+          <p>内置 smoke、quorum、rolling restart 三类脚本，覆盖 leader failover、少数派拒写、旧 leader 恢复和逐节点重启验证。</p>
+        </div>
+      </div>
+      <div class="code-block" style="margin-top: 28px;">
+        <div class="code-bar"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span><span class="code-file">ops.sh</span></div>
+        <pre><code><span class="cm"># local raft smoke test</span>
+make e2e-raft
+
+<span class="cm"># quorum behavior test</span>
+make e2e-raft-quorum
+
+<span class="cm"># rolling restart recovery test</span>
+make e2e-raft-rolling</code></pre>
       </div>
     </div>
   </section>
@@ -303,7 +409,7 @@ docker run \
     <div class="container footer-inner">
       <div class="footer-brand">
         <span class="logo-bracket">[</span>MCache<span class="logo-bracket">]</span>
-        <p>A fast, hierarchical in-memory cache for Go.</p>
+        <p>A fast, hierarchical in-memory cache for Go, now with raft-backed cluster mode.</p>
       </div>
       <div class="footer-links">
         <a href="https://github.com/mcache-team/mcache" target="_blank">GitHub</a>
