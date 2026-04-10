@@ -222,8 +222,43 @@ The Prometheus-style metrics output now includes write-path counters and latency
 - `mcache_write_success_total{operation=...}`
 - `mcache_write_error_total{operation=...}`
 - `mcache_write_redirect_total{operation=...}`
-- `mcache_write_latency_seconds_total{operation=...}`
+- `mcache_write_latency_seconds_bucket{operation=...,le=...}`
+- `mcache_write_latency_seconds_sum{operation=...}`
+- `mcache_write_latency_seconds_count{operation=...}`
 - `mcache_write_latency_last_seconds{operation=...}`
+
+The `/metrics` endpoint also emits standard Prometheus `# HELP` and `# TYPE` metadata, so it can be scraped directly without a sidecar reformatter.
+
+Example Prometheus scrape config:
+
+```yaml
+scrape_configs:
+  - job_name: mcache
+    static_configs:
+      - targets:
+          - 127.0.0.1:8081
+          - 127.0.0.1:8082
+          - 127.0.0.1:8083
+```
+
+Example PromQL queries:
+
+```promql
+# p95 create latency over 5 minutes
+histogram_quantile(
+  0.95,
+  sum by (le) (rate(mcache_write_latency_seconds_bucket{operation="data_create"}[5m]))
+)
+
+# redirect rate over 5 minutes
+sum(rate(mcache_write_redirect_total[5m]))
+
+# error rate over 5 minutes
+sum(rate(mcache_write_error_total[5m]))
+
+# current cached item count per node
+mcache_state_items_total
+```
 
 ## HTTP API Reference
 
