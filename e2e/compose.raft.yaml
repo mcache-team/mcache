@@ -1,0 +1,97 @@
+services:
+  mcache1:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        - GOPROXY=https://goproxy.cn,direct
+    environment:
+      MCACHE_CLUSTER_MODE: raft
+      MCACHE_NODE_ID: node-1
+      MCACHE_HTTP_ADDR: 0.0.0.0:8080
+      MCACHE_ADVERTISE_ADDR: http://127.0.0.1:18081
+      MCACHE_RAFT_BIND_ADDR: 0.0.0.0:7001
+      MCACHE_RAFT_ADVERTISE_ADDR: mcache1:7001
+      MCACHE_RAFT_DATA_DIR: /var/lib/mcache/raft
+      MCACHE_RAFT_BOOTSTRAP: "true"
+      MCACHE_CLUSTER_PEERS: node-1@mcache1:7001@http://127.0.0.1:18081,node-2@mcache2:7002@http://127.0.0.1:18082,node-3@mcache3:7003@http://127.0.0.1:18083
+    ports:
+      - "18081:8080"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "cat < /dev/null > /dev/tcp/127.0.0.1/8080"]
+      interval: 3s
+      timeout: 60s
+      retries: 20
+      start_period: 3s
+
+  mcache2:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        - GOPROXY=https://goproxy.cn,direct
+    environment:
+      MCACHE_CLUSTER_MODE: raft
+      MCACHE_NODE_ID: node-2
+      MCACHE_HTTP_ADDR: 0.0.0.0:8080
+      MCACHE_ADVERTISE_ADDR: http://127.0.0.1:18082
+      MCACHE_RAFT_BIND_ADDR: 0.0.0.0:7002
+      MCACHE_RAFT_ADVERTISE_ADDR: mcache2:7002
+      MCACHE_RAFT_DATA_DIR: /var/lib/mcache/raft
+      MCACHE_CLUSTER_PEERS: node-1@mcache1:7001@http://127.0.0.1:18081,node-2@mcache2:7002@http://127.0.0.1:18082,node-3@mcache3:7003@http://127.0.0.1:18083
+    ports:
+      - "18082:8080"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "cat < /dev/null > /dev/tcp/127.0.0.1/8080"]
+      interval: 3s
+      timeout: 60s
+      retries: 20
+      start_period: 3s
+
+  mcache3:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        - GOPROXY=https://goproxy.cn,direct
+    environment:
+      MCACHE_CLUSTER_MODE: raft
+      MCACHE_NODE_ID: node-3
+      MCACHE_HTTP_ADDR: 0.0.0.0:8080
+      MCACHE_ADVERTISE_ADDR: http://127.0.0.1:18083
+      MCACHE_RAFT_BIND_ADDR: 0.0.0.0:7003
+      MCACHE_RAFT_ADVERTISE_ADDR: mcache3:7003
+      MCACHE_RAFT_DATA_DIR: /var/lib/mcache/raft
+      MCACHE_CLUSTER_PEERS: node-1@mcache1:7001@http://127.0.0.1:18081,node-2@mcache2:7002@http://127.0.0.1:18082,node-3@mcache3:7003@http://127.0.0.1:18083
+    ports:
+      - "18083:8080"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "cat < /dev/null > /dev/tcp/127.0.0.1/8080"]
+      interval: 3s
+      timeout: 60s
+      retries: 20
+      start_period: 3s
+
+  mcache4:
+    profiles: ["joiner"]
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        - GOPROXY=https://goproxy.cn,direct
+    environment:
+      MCACHE_CLUSTER_MODE: raft
+      MCACHE_NODE_ID: node-4
+      MCACHE_HTTP_ADDR: 0.0.0.0:8080
+      MCACHE_ADVERTISE_ADDR: http://127.0.0.1:18084
+      MCACHE_RAFT_BIND_ADDR: 0.0.0.0:7004
+      MCACHE_RAFT_ADVERTISE_ADDR: mcache4:7004
+      MCACHE_RAFT_DATA_DIR: /var/lib/mcache/raft
+    ports:
+      - "18084:8080"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "cat < /dev/null > /dev/tcp/127.0.0.1/8080"]
+      interval: 3s
+      timeout: 60s
+      retries: 20
+      start_period: 3s

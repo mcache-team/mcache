@@ -3,7 +3,7 @@ package storage
 import (
 	"github.com/mcache-team/mcache/pkg/apis/v1/item"
 	"github.com/mcache-team/mcache/pkg/apis/v1/storage"
-	"github.com/mcache-team/mcache/pkg/storage/memory"
+	"github.com/mcache-team/mcache/pkg/state"
 )
 
 var StorageClient = NewStorage()
@@ -46,5 +46,5 @@ func (s *storageClient) Delete(prefix string) (interface{}, error) {
 }
 
 func NewStorage() *storageClient {
-	return &storageClient{store: memory.NewStorage(), storeType: memory.MemoryStoreType}
+	return &storageClient{store: state.DefaultStateMachine, storeType: "state-machine"}
 }

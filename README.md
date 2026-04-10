@@ -91,6 +91,175 @@ PERSIST_DIR=/data PERSIST_INTERVAL=30s ./mcache
 
 On restart, data is automatically restored from `<PERSIST_DIR>/mcache-snapshot.json`. Expired entries are skipped.
 
+### Cluster mode (experimental)
+
+`mcache` now has a first `raft`-backed cluster mode for replicated writes.
+
+Node 1:
+
+```bash
+MCACHE_CLUSTER_MODE=raft \
+MCACHE_NODE_ID=node-1 \
+MCACHE_HTTP_ADDR=0.0.0.0:8081 \
+MCACHE_ADVERTISE_ADDR=http://127.0.0.1:8081 \
+MCACHE_RAFT_BIND_ADDR=127.0.0.1:7001 \
+MCACHE_RAFT_ADVERTISE_ADDR=127.0.0.1:7001 \
+MCACHE_RAFT_BOOTSTRAP=true \
+MCACHE_CLUSTER_PEERS='node-1@127.0.0.1:7001@http://127.0.0.1:8081,node-2@127.0.0.1:7002@http://127.0.0.1:8082,node-3@127.0.0.1:7003@http://127.0.0.1:8083' \
+go run ./pkg
+```
+
+Node 2:
+
+```bash
+MCACHE_CLUSTER_MODE=raft \
+MCACHE_NODE_ID=node-2 \
+MCACHE_HTTP_ADDR=0.0.0.0:8082 \
+MCACHE_ADVERTISE_ADDR=http://127.0.0.1:8082 \
+MCACHE_RAFT_BIND_ADDR=127.0.0.1:7002 \
+MCACHE_RAFT_ADVERTISE_ADDR=127.0.0.1:7002 \
+MCACHE_RAFT_DATA_DIR=./data/node-2/raft \
+MCACHE_CLUSTER_PEERS='node-1@127.0.0.1:7001@http://127.0.0.1:8081,node-2@127.0.0.1:7002@http://127.0.0.1:8082,node-3@127.0.0.1:7003@http://127.0.0.1:8083' \
+go run ./pkg
+```
+
+Node 3:
+
+```bash
+MCACHE_CLUSTER_MODE=raft \
+MCACHE_NODE_ID=node-3 \
+MCACHE_HTTP_ADDR=0.0.0.0:8083 \
+MCACHE_ADVERTISE_ADDR=http://127.0.0.1:8083 \
+MCACHE_RAFT_BIND_ADDR=127.0.0.1:7003 \
+MCACHE_RAFT_ADVERTISE_ADDR=127.0.0.1:7003 \
+MCACHE_RAFT_DATA_DIR=./data/node-3/raft \
+MCACHE_CLUSTER_PEERS='node-1@127.0.0.1:7001@http://127.0.0.1:8081,node-2@127.0.0.1:7002@http://127.0.0.1:8082,node-3@127.0.0.1:7003@http://127.0.0.1:8083' \
+go run ./pkg
+```
+
+Notes:
+
+- Only one node should start with `MCACHE_RAFT_BOOTSTRAP=true`.
+- `MCACHE_CLUSTER_PEERS` uses the format `nodeID@raftAddr@httpAddr`.
+- Writes must go to the leader. Followers will respond with `307 Temporary Redirect`.
+- Cluster status is exposed at `GET /v1/cluster/status`.
+- Dynamic membership is available from the leader:
+
+```bash
+# list members
+curl http://127.0.0.1:8081/v1/cluster/nodes
+
+# add a voter
+curl -X POST http://127.0.0.1:8081/v1/cluster/nodes \
+  -H 'Content-Type: application/json' \
+  -d '{"nodeId":"node-4","raftAddress":"127.0.0.1:7004","advertiseAddress":"http://127.0.0.1:8084"}'
+
+# remove a member
+curl -X DELETE http://127.0.0.1:8081/v1/cluster/nodes/node-4
+```
+
+- This is the current cluster milestone: replicated writes + snapshot/restore + leader redirects + dynamic voter membership. Shard routing and follower read optimizations are not implemented yet.
+
+### Cluster smoke test
+
+You can run the local raft smoke test with Docker:
+
+```bash
+bash e2e/raft-start.sh
+```
+
+Or through `make`:
+
+```bash
+make e2e-raft
+```
+
+The smoke test boots a 3-node raft cluster, verifies leader election, checks replicated writes on all nodes, confirms follower redirects, starts a fourth node, joins it dynamically, removes it again, stops the current leader to verify failover, then starts that old leader back up and confirms it catches up and rejoins as a follower.
+
+### Quorum test
+
+You can also verify quorum behavior with:
+
+```bash
+make e2e-raft-quorum
+```
+
+This test boots the 3-node raft cluster, stops one follower and confirms the remaining majority is still writable, then stops the second follower and confirms the isolated node can no longer complete writes, and finally brings the cluster back to full size and verifies writes succeed again.
+
+### Rolling restart test
+
+To verify node-by-node restart recovery:
+
+```bash
+make e2e-raft-rolling
+```
+
+This test performs a rolling restart across all three raft nodes. After each restart it waits for the node to become healthy again, checks that the cluster still has a leader, writes a fresh value through the current leader, and verifies every node can read both the old and new data.
+
+### Health and metrics
+
+`mcache` now exposes lightweight observability endpoints:
+
+```bash
+# liveness
+curl http://127.0.0.1:8080/livez
+
+# readiness
+curl http://127.0.0.1:8080/readyz
+
+# cluster diagnostics as JSON
+curl http://127.0.0.1:8080/v1/cluster/diagnostics
+
+# Prometheus-style metrics
+curl http://127.0.0.1:8080/metrics
+```
+
+The diagnostics payload includes node role, readiness, member list, cache item/root counts, and raw raft stats when running in cluster mode.
+
+The Prometheus-style metrics output now includes write-path counters and latency totals such as:
+
+- `mcache_write_requests_total{operation=...}`
+- `mcache_write_success_total{operation=...}`
+- `mcache_write_error_total{operation=...}`
+- `mcache_write_redirect_total{operation=...}`
+- `mcache_write_latency_seconds_bucket{operation=...,le=...}`
+- `mcache_write_latency_seconds_sum{operation=...}`
+- `mcache_write_latency_seconds_count{operation=...}`
+- `mcache_write_latency_last_seconds{operation=...}`
+
+The `/metrics` endpoint also emits standard Prometheus `# HELP` and `# TYPE` metadata, so it can be scraped directly without a sidecar reformatter.
+
+Example Prometheus scrape config:
+
+```yaml
+scrape_configs:
+  - job_name: mcache
+    static_configs:
+      - targets:
+          - 127.0.0.1:8081
+          - 127.0.0.1:8082
+          - 127.0.0.1:8083
+```
+
+Example PromQL queries:
+
+```promql
+# p95 create latency over 5 minutes
+histogram_quantile(
+  0.95,
+  sum by (le) (rate(mcache_write_latency_seconds_bucket{operation="data_create"}[5m]))
+)
+
+# redirect rate over 5 minutes
+sum(rate(mcache_write_redirect_total[5m]))
+
+# error rate over 5 minutes
+sum(rate(mcache_write_error_total[5m]))
+
+# current cached item count per node
+mcache_state_items_total
+```
+
 ## HTTP API Reference
 
 | Method | Path | Description |
@@ -101,6 +270,14 @@ On restart, data is automatically restored from `<PERSIST_DIR>/mcache-snapshot.j
 | `DELETE` | `/v1/data/:prefix` | Delete entry (200 / 404) |
 | `GET` | `/v1/data/listByPrefix?prefix=` | List direct children under a path |
 | `GET` | `/v1/prefix/count` | Count all stored prefixes |
+| `GET` | `/livez` | Liveness probe |
+| `GET` | `/readyz` | Readiness probe |
+| `GET` | `/metrics` | Prometheus-style metrics |
+| `GET` | `/v1/cluster/status` | Show node mode, leader and advertised addresses |
+| `GET` | `/v1/cluster/diagnostics` | Show readiness, members, state counters and raft stats |
+| `GET` | `/v1/cluster/nodes` | List cluster members |
+| `POST` | `/v1/cluster/nodes` | Add a voter node on the leader |
+| `DELETE` | `/v1/cluster/nodes/:nodeId` | Remove a cluster member on the leader |
 | `GET` | `/healthz` | Health check |
 
 ## Benchmark

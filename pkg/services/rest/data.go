@@ -3,10 +3,14 @@ package rest
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/mcache-team/mcache/pkg/apis/v1/item"
+	"github.com/mcache-team/mcache/pkg/cluster"
 	"github.com/mcache-team/mcache/pkg/handlers"
 	"github.com/mcache-team/mcache/pkg/services/response"
+	"github.com/mcache-team/mcache/pkg/state"
 	"github.com/mcache-team/mcache/pkg/storage"
 	"github.com/sirupsen/logrus"
+	"net/http"
+	"time"
 )
 
 func init() {
@@ -27,6 +31,7 @@ func (d *DataHandler) RegisterRouter(e *gin.Engine) {
 	group := e.Group(d.BasePath())
 	group.GET("/listByPrefix", d.listByPrefix)
 	group.GET("/:prefix", d.get)
+	group.POST("/:prefix", d.update)
 	group.DELETE("/:prefix", d.delete)
 	group.PUT("", d.create)
 }
@@ -48,19 +53,51 @@ func (d *DataHandler) create(ctx *gin.Context) {
 		response.ResponseBadRequest(ctx, err)
 		return
 	}
-	if err := handlers.PrefixHandler.InsertNode(req.Prefix, req.Data); err != nil {
-		response.ResponseInternalServerError(ctx, err)
+	if err := submitWrite(ctx, "data_create", state.Command{
+		Type:   state.CommandInsert,
+		Prefix: req.Prefix,
+		Item: &item.Item{
+			Prefix:     req.Prefix,
+			Data:       req.Data,
+			Timeout:    req.Timeout,
+			ExpireTime: req.ExpireTime,
+			CreatedAt:  time.Now(),
+			UpdatedAt:  time.Now(),
+		},
+	}, http.StatusCreated); err != nil {
 		return
 	}
-	response.ResponseCreated(ctx)
+}
+
+func (d *DataHandler) update(ctx *gin.Context) {
+	prefix := ctx.Param("prefix")
+	var req item.Item
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		response.ResponseBadRequest(ctx, err)
+		return
+	}
+	if err := submitWrite(ctx, "data_update", state.Command{
+		Type:   state.CommandUpdate,
+		Prefix: prefix,
+		Item: &item.Item{
+			Prefix:     prefix,
+			Data:       req.Data,
+			Timeout:    req.Timeout,
+			ExpireTime: req.ExpireTime,
+			UpdatedAt:  time.Now(),
+		},
+	}, http.StatusOK); err != nil {
+		return
+	}
 }
 
 func (d *DataHandler) delete(ctx *gin.Context) {
 	prefix := ctx.Param("prefix")
-	if err := handlers.PrefixHandler.RemoveNode(prefix); err != nil {
-		response.ResponseInternalServerError(ctx, err)
-	} else {
-		response.ResponseSuccess(ctx)
+	if err := submitWrite(ctx, "data_delete", state.Command{
+		Type:   state.CommandDelete,
+		Prefix: prefix,
+	}, http.StatusOK); err != nil {
+		return
 	}
 }
 
@@ -76,4 +113,32 @@ func (d *DataHandler) listByPrefix(ctx *gin.Context) {
 		return
 	}
 	response.ResponseData(ctx, data)
+}
+
+func submitWrite(ctx *gin.Context, operation string, cmd state.Command, successStatus int) error {
+	startedAt := time.Now()
+	_, err := cluster.DefaultNode.Submit(cmd)
+	if err == nil {
+		cluster.DefaultTelemetry.ObserveWrite(operation, time.Since(startedAt), "success")
+		switch successStatus {
+		case http.StatusCreated:
+			response.ResponseCreated(ctx)
+		default:
+			response.ResponseSuccess(ctx)
+		}
+		return nil
+	}
+
+	if redirect, ok := err.(*cluster.NotLeaderError); ok {
+		cluster.DefaultTelemetry.ObserveWrite(operation, time.Since(startedAt), "redirect")
+		response.ResponseTemporaryRedirect(ctx, redirect.LeaderAddress)
+		return err
+	}
+	cluster.DefaultTelemetry.ObserveWrite(operation, time.Since(startedAt), "error")
+	if err == item.PrefixExisted {
+		response.ResponseAlreadyExists(ctx)
+		return err
+	}
+	response.RespondFailure(ctx, err)
+	return err
 }
