@@ -4,8 +4,9 @@
 [![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8?logo=go)](https://go.dev/)
 [![License](https://img.shields.io/github/license/mcache-team/mcache)](LICENSE)
 [![Pages](https://github.com/mcache-team/mcache/actions/workflows/pages/pages-build-deployment/badge.svg)](https://github.com/mcache-team/mcache/actions/workflows/pages/pages-build-deployment)
-![mcache](doc/pic/mcache.png)
 [![Powered by OrcaRouter](https://img.shields.io/badge/Powered_by-OrcaRouter-2563eb)](https://www.orcarouter.ai/ref/ref_f11e65d3d38699e8d2f9)
+![mcache](doc/pic/mcache.png)
+
 
 A fast, hierarchical in-memory cache for Go. Supports multi-level key paths, TTL expiration, HTTP/gRPC service modes, periodic disk persistence, and direct module embedding — no external dependencies required.
 
