@@ -65,7 +65,7 @@ func (s *StateMachine) GetOne(prefix string) (*item.Item, error) {
 	defer s.mu.RUnlock()
 
 	cacheItem, ok := s.items[normalizePrefix(prefix)]
-	if !ok {
+	if !ok || s.isExpired(cacheItem) {
 		return nil, item.NoDataError
 	}
 	return cloneItem(cacheItem), nil
@@ -78,7 +78,7 @@ func (s *StateMachine) ListPrefixData(prefixList []string) ([]*item.Item, error)
 	result := make([]*item.Item, 0, len(prefixList))
 	for _, prefix := range prefixList {
 		cacheItem, ok := s.items[normalizePrefix(prefix)]
-		if !ok {
+		if !ok || s.isExpired(cacheItem) {
 			continue
 		}
 		result = append(result, cloneItem(cacheItem))
@@ -95,7 +95,8 @@ func (s *StateMachine) CountPrefixData(prefixList []string) int {
 
 	count := 0
 	for _, prefix := range prefixList {
-		if _, ok := s.items[normalizePrefix(prefix)]; ok {
+		cacheItem, ok := s.items[normalizePrefix(prefix)]
+		if ok && !s.isExpired(cacheItem) {
 			count++
 		}
 	}
@@ -108,8 +109,11 @@ func (s *StateMachine) ListPrefix(prePrefix string) ([]string, error) {
 
 	prefix := normalizePrefix(prePrefix)
 	result := make([]string, 0, len(s.items))
-	for key := range s.items {
+	for key, cacheItem := range s.items {
 		if prefix == "" || strings.HasPrefix(key, prefix) {
+			if s.isExpired(cacheItem) {
+				continue
+			}
 			result = append(result, key)
 		}
 	}
@@ -123,12 +127,22 @@ func (s *StateMachine) CountPrefix(prePrefix string) int {
 
 	prefix := normalizePrefix(prePrefix)
 	count := 0
-	for key := range s.items {
+	for key, cacheItem := range s.items {
 		if prefix == "" || strings.HasPrefix(key, prefix) {
+			if s.isExpired(cacheItem) {
+				continue
+			}
 			count++
 		}
 	}
 	return count
+}
+
+// isExpired reports whether an item's TTL has passed. Expiration is enforced
+// lazily on reads: expired items stay until they are overwritten or deleted,
+// which keeps every node's view deterministic without background mutation.
+func (s *StateMachine) isExpired(cacheItem *item.Item) bool {
+	return cacheItem != nil && !cacheItem.ExpireTime.IsZero() && time.Now().After(cacheItem.ExpireTime)
 }
 
 func (s *StateMachine) Insert(prefix string, data interface{}, opt ...item.Option) error {
@@ -203,7 +217,7 @@ func (s *StateMachine) ListByPrefix(prefix string) ([]*item.Item, error) {
 		}
 		fullPrefix := joinPrefix(basePrefix, name)
 		cacheItem, ok := s.items[fullPrefix]
-		if !ok {
+		if !ok || s.isExpired(cacheItem) {
 			continue
 		}
 		result = append(result, cloneItem(cacheItem))
@@ -268,7 +282,7 @@ func (s *StateMachine) insertItem(prefix string, newItem *item.Item) error {
 	defer s.mu.Unlock()
 
 	prefix = normalizePrefix(prefix)
-	if _, ok := s.items[prefix]; ok {
+	if current, ok := s.items[prefix]; ok && !s.isExpired(current) {
 		return item.PrefixExisted
 	}
 	s.items[prefix] = cloneItem(newItem)

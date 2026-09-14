@@ -1,4 +1,4 @@
-FROM golang:1.21 AS build-stage
+FROM golang:1.25 AS build-stage
 ARG GOPROXY=direct
 WORKDIR /opt/build
 

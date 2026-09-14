@@ -54,6 +54,17 @@ c.Update("user/profile/name", "bob")
 c.Delete("user/profile/name")
 ```
 
+Agent memory also works when embedded:
+
+```go
+import "github.com/mcache-team/mcache/pkg/handlers"
+
+sessionID, _ := handlers.Memory.CreateSession("bot-1", "", 0)
+handlers.Memory.AppendWorkingMemory("bot-1", sessionID, "user prefers concise answers", time.Hour)
+handlers.Memory.PutFact("bot-1", "lang", "go", 0)
+facts, _ := handlers.Memory.GetFacts("bot-1", "")
+```
+
 ### HTTP service
 
 ```bash
@@ -266,6 +277,87 @@ sum(rate(mcache_write_error_total[5m]))
 mcache_state_items_total
 ```
 
+### MCP server (AI agents)
+
+`mcache` exposes an MCP (Model Context Protocol) server so coding agents such as Claude Code, Cursor or any MCP client can use the cache and the agent memory layer directly as tools. No AI-related configuration is needed on the mcache side — clients register mcache in their own MCP config.
+
+Two transports are available:
+
+```bash
+# 1. Streamable HTTP (default): the MCP endpoint is mounted on the HTTP server
+./mcache
+# MCP endpoint: http://localhost:8080/mcp
+
+# 2. stdio: the process becomes a stdio MCP server (for local clients like Claude Desktop)
+MCACHE_MCP_STDIO=true ./mcache
+```
+
+Example MCP client config (Cursor / Claude Desktop / opencode):
+
+```json
+{
+  "mcpServers": {
+    "mcache": {
+      "command": "/usr/local/bin/mcache",
+      "env": { "MCACHE_MCP_STDIO": "true" }
+    }
+  }
+}
+```
+
+For the HTTP transport, point the client at `http://localhost:8080/mcp` instead.
+
+Exposed tools:
+
+| Tool | Description |
+|---|---|
+| `cache_get` | Get one item by exact key path |
+| `cache_set` | Insert or update an item (optional TTL, upsert by default) |
+| `cache_delete` | Delete an item |
+| `cache_list` / `cache_list_items` | List key paths or full items under a prefix |
+| `cache_count` | Count items under a prefix |
+| `cluster_status` | Node mode, leader and readiness |
+| `memory_create_session` | Create an agent session (optional TTL, id auto-generated) |
+| `memory_append_working` / `memory_get_working` | Append/read a session's ordered working memory |
+| `memory_scratchpad_put` / `memory_scratchpad_get` | Named scratchpad values per session |
+| `memory_put_fact` / `memory_get_facts` / `memory_delete_fact` | Long-lived agent facts |
+| `memory_list_sessions` / `memory_delete_session` | List sessions / delete a session with all entries |
+
+Writes through MCP go through the same raft write path as REST: in cluster mode, a non-leader node returns an error message containing the leader address instead of a redirect.
+
+### Agent memory
+
+The agent memory layer stores hierarchical memory for AI agents on top of the normal cache:
+
+- `memory/agent/{agentId}/sessions/{sessionId}/working/{seq}` — TTL-backed working memory, insertion order preserved
+- `memory/agent/{agentId}/sessions/{sessionId}/scratch/{key}` — per-session scratchpad
+- `memory/agent/{agentId}/facts/{key}` — long-lived facts
+
+```bash
+# Create a session (sessionId is generated when omitted)
+curl -X POST http://localhost:8080/v1/memory/agents/bot-1/sessions \
+  -H 'Content-Type: application/json' \
+  -d '{}'
+
+# Append working memory (expires after 1 hour)
+curl -X POST http://localhost:8080/v1/memory/agents/bot-1/sessions/<sessionId>/working \
+  -H 'Content-Type: application/json' \
+  -d '{"content":"user prefers concise answers","ttlSeconds":3600}'
+
+# Read it back
+curl http://localhost:8080/v1/memory/agents/bot-1/sessions/<sessionId>/working
+
+# Store a long-lived fact
+curl -X POST http://localhost:8080/v1/memory/agents/bot-1/facts \
+  -H 'Content-Type: application/json' \
+  -d '{"key":"lang","content":"go"}'
+
+# Delete the session and everything in it
+curl -X DELETE http://localhost:8080/v1/memory/agents/bot-1/sessions/<sessionId>
+```
+
+TTL is now enforced lazily on reads for all keys, so entries created with a TTL disappear from reads once expired — in every cluster node.
+
 ## HTTP API Reference
 
 | Method | Path | Description |
@@ -284,6 +376,19 @@ mcache_state_items_total
 | `GET` | `/v1/cluster/nodes` | List cluster members |
 | `POST` | `/v1/cluster/nodes` | Add a voter node on the leader |
 | `DELETE` | `/v1/cluster/nodes/:nodeId` | Remove a cluster member on the leader |
+| `POST` | `/v1/memory/agents/:agentId/sessions` | Create an agent session |
+| `GET` | `/v1/memory/agents/:agentId/sessions` | List agent sessions |
+| `DELETE` | `/v1/memory/agents/:agentId/sessions/:sessionId` | Delete a session with all entries |
+| `POST` | `/v1/memory/agents/:agentId/sessions/:sessionId/working` | Append a working-memory entry |
+| `GET` | `/v1/memory/agents/:agentId/sessions/:sessionId/working` | List working-memory entries |
+| `PUT` | `/v1/memory/agents/:agentId/sessions/:sessionId/scratchpad/:key` | Store a scratchpad value |
+| `GET` | `/v1/memory/agents/:agentId/sessions/:sessionId/scratchpad` | List scratchpad values |
+| `GET` | `/v1/memory/agents/:agentId/sessions/:sessionId/scratchpad/:key` | Read one scratchpad value |
+| `POST` | `/v1/memory/agents/:agentId/facts` | Store a long-lived fact |
+| `GET` | `/v1/memory/agents/:agentId/facts` | List all facts of an agent |
+| `GET` | `/v1/memory/agents/:agentId/facts/:key` | Read one fact |
+| `DELETE` | `/v1/memory/agents/:agentId/facts/:key` | Delete a fact |
+| `POST` | `/mcp` | MCP streamable HTTP endpoint |
 | `GET` | `/healthz` | Health check |
 
 ## Benchmark
@@ -312,6 +417,16 @@ Results on Apple M2 (darwin/arm64, Go 1.21):
 - **Get is the fastest path** — lock-free `sync.Map` reads hit ~18M ops/sec single-threaded, ~52M ops/sec parallel.
 - **Insert is the bottleneck** — a write lock on `prefixList` after `LoadOrStore` caps throughput at ~3M ops/sec.
 - **ListPrefix scales linearly** — full scan of `prefixList` under a read lock; cost grows with key count.
+
+## Recommended: OrcaRouter
+
+When building AI agents on top of mcache, we recommend [OrcaRouter](https://www.orcarouter.ai/ref/ref_f11e65d3d38699e8d2f9) as your LLM gateway:
+
+- Route requests across multiple LLM providers with automatic failover
+- Cache and observe LLM traffic while mcache holds the agent state and memory
+- Combine both: agents get their working memory and facts from mcache, while OrcaRouter handles model routing, retries and cost control
+
+Get started with OrcaRouter here: [orcarouter.ai](https://www.orcarouter.ai/ref/ref_f11e65d3d38699e8d2f9)
 
 ## Contributing
 

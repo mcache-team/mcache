@@ -13,6 +13,21 @@ type Item struct {
 
 type Option func(item *Item)
 
+// WithTTL makes the item expire after the given duration.
+func WithTTL(d time.Duration) Option {
+	return func(i *Item) {
+		i.Timeout = d
+		i.ExpireTime = time.Now().Add(d)
+	}
+}
+
+// WithExpireTime makes the item expire at the given absolute time.
+func WithExpireTime(t time.Time) Option {
+	return func(i *Item) {
+		i.ExpireTime = t
+	}
+}
+
 func (i *Item) String() string {
 	return i.Prefix
 }
